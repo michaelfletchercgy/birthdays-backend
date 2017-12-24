@@ -1,0 +1,7 @@
+CREATE TABLE birthdays (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR NOT NULL,
+  year INTEGER,
+  month INTEGER NOT NULL,
+  day INTEGER NOT NULL
+)
