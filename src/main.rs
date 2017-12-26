@@ -173,7 +173,7 @@ fn login(args:Option<LoginArgs>, mut cookies:Cookies) {
 fn static_files(file: PathBuf) -> Option<NamedFile> {
     let frontend_path = env::var("FRONTEND_PATH")
         .expect("FRONTEND_PATH must be set");
-
+    println!("{:?}-{:?}", &frontend_path, &file);
     NamedFile::open(Path::new(&frontend_path).join(file)).ok()
 }
 
