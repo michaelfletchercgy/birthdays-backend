@@ -72,8 +72,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 }
 
 pub fn establish_connection() -> PgConnection {
-    dotenv().ok();
-
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
     PgConnection::establish(&database_url)
@@ -173,10 +171,16 @@ fn login(args:Option<LoginArgs>, mut cookies:Cookies) {
 
 #[get("/<file..>")]
 fn static_files(file: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(Path::new("static/").join(file)).ok()
+    let frontend_path = env::var("FRONTEND_PATH")
+        .expect("FRONTEND_PATH must be set");
+
+    NamedFile::open(Path::new(&frontend_path).join(file)).ok()
 }
 
 fn main() {
+    dotenv().ok();
+
+
     rocket::ignite()
         .mount("/bday/", routes![static_files])
         .mount("/api/", routes![index, bday_get, bday_post, login])        
