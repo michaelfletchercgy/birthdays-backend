@@ -5,6 +5,7 @@ extern crate rocket;
 extern crate rocket_contrib;
 
 #[macro_use] extern crate diesel;
+#[macro_use] extern crate diesel_migrations;
 #[macro_use] extern crate diesel_infer_schema;
 extern crate dotenv;
 
@@ -177,9 +178,17 @@ fn static_files(file: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new(&frontend_path).join(file)).ok()
 }
 
+embed_migrations!("migrations");
+
 fn main() {
     dotenv().ok();
 
+
+    let connection = establish_connection();
+
+    // By default the output is thrown out. If you want to redirect it to stdout, you
+    // should call embedded_migrations::run_with_output.
+    embedded_migrations::run_with_output(&connection, &mut std::io::stdout()).unwrap();
 
     rocket::ignite()
         .mount("/bday/", routes![static_files])
