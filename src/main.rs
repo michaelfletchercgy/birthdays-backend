@@ -6,7 +6,6 @@ extern crate rocket_contrib;
 
 #[macro_use] extern crate diesel;
 #[macro_use] extern crate diesel_migrations;
-#[macro_use] extern crate diesel_infer_schema;
 extern crate dotenv;
 
 #[macro_use]
@@ -60,15 +59,6 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
                 Outcome::Failure((Status::Unauthorized, ()))
             }
         }
-        /*let keys: Vec<_> = request.headers().get("x-api-key").collect();
-        if keys.len() != 1 {
-            return Outcome::Failure((Status::BadRequest, ()));
-        }
-
-        let key = keys[0];
-        if !is_valid(keys[0]) {
-            return Outcome::Forward(());
-        }*/
     }
 }
 
@@ -80,7 +70,7 @@ pub fn establish_connection() -> PgConnection {
 }
 
 #[get("/check")]
-fn check(_unused:User) -> () {
+fn check(_unused:User) -> () {    
     
 }
 
@@ -101,7 +91,7 @@ fn index(_unused:User) -> Json<Vec<Birthday>> {
 
 // #[post("foo")] delete, put, 
 #[get("/birthdays/<birthday_id>")]
-fn bday_get(birthday_id:i32) -> Json<Birthday> {
+fn bday_get(_unused:User, birthday_id:i32) -> Json<Birthday> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
@@ -116,7 +106,7 @@ fn bday_get(birthday_id:i32) -> Json<Birthday> {
 }
 
 #[post("/birthdays/<birthday_id>", data = "<bday>")]
-fn bday_post(birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
+fn bday_post(_unused:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
@@ -149,6 +139,22 @@ fn bday_post(birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
     
     // apparently has a 1mb limit
     Json(result)
+}
+
+#[delete("/birthdays/<birthday_id>")]
+fn bday_delete(_unused:User, birthday_id: i32) -> String {
+    use ::schema::birthdays::dsl::*;
+
+    let connection = establish_connection();
+
+    diesel::delete(
+        birthdays.filter(id.eq(birthday_id))
+    )
+    .execute(&connection)
+    .expect("delete ok");
+    // should have done something here.
+    
+    String::from("ok")
 }
 
 #[derive(FromForm)]
@@ -192,7 +198,7 @@ fn main() {
 
     rocket::ignite()
         .mount("/bday/", routes![static_files])
-        .mount("/api/", routes![index, bday_get, bday_post, login])        
+        .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete])        
         .launch();
 }
 
