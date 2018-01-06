@@ -38,22 +38,46 @@ use rocket::http::Cookies;
 use rocket::http::Cookie;
 use rocket::request::{self, Request, FromRequest};
 
+#[derive(Serialize)]
+#[derive(Deserialize)]
+pub struct Birthday {
+    pub id: i32,
+    pub title: String,
+    pub year: Option<i32>,
+    pub month: i32,
+    pub day: i32
+}
 
-struct User {
-    user_id:String
+impl Birthday {
+    pub fn as_birthday_record(&self, user:&User) -> BirthdayRecord {
+        BirthdayRecord {
+            id: self.id,
+            title: self.title.clone(),
+            year: self.year,
+            month: self.month,
+            day: self.day,
+            user_id: user.user_id
+        }
+    }
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<User, ()> {
-        match request.cookies().get_private("user_id") {
-            Some(user_id) => {
-                Outcome::Success(
-                    User{
-                        user_id:user_id.to_string()
-                    }
-                )
+        match request.cookies().get_private("user_name") {
+            Some(user_name_cookie) => {
+                use ::schema::users::dsl::*;
+
+                let connection = establish_connection();
+
+                let x = users
+                    .limit(1)
+                    .filter(user_name.eq(&user_name_cookie.value()))
+                    .first::<User>(&connection)
+                    .expect("Error loading user");
+                    
+                Outcome::Success(x)
             },
             None => {
                 Outcome::Failure((Status::Unauthorized, ()))
@@ -71,52 +95,57 @@ pub fn establish_connection() -> PgConnection {
 
 #[get("/check")]
 fn check(_unused:User) -> () {    
-    
+
 }
 
 #[get("/birthdays")]
-fn index(_unused:User) -> Json<Vec<Birthday>> {
+fn index(user:User) -> Json<Vec<Birthday>> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
 
     let results = birthdays
+        .filter(user_id.eq(user.user_id))
         .order(title.asc())
-        .load::<Birthday>(&connection)
+        .load::<BirthdayRecord>(&connection)
         .expect("Error loading birthdays");
 
+    let new_results = results.into_iter().map(|x| x.as_birthday()).collect();
+
     // apparently has a 1mb limit
-    Json(results)
+    Json(new_results)
 }
 
 // #[post("foo")] delete, put, 
 #[get("/birthdays/<birthday_id>")]
-fn bday_get(_unused:User, birthday_id:i32) -> Json<Birthday> {
+fn bday_get(user:User, birthday_id:i32) -> Json<Birthday> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
     let result = birthdays
         .limit(1)
         .filter(id.eq(birthday_id))
-        .first::<Birthday>(&connection)
+        .filter(user_id.eq(user.user_id))
+        .first::<BirthdayRecord>(&connection)
         .expect("Error loading birthdays");
 
     // apparently has a 1mb limit
-    Json(result)
+    Json(result.as_birthday())
 }
 
 #[post("/birthdays/<birthday_id>", data = "<bday>")]
-fn bday_post(_unused:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
+fn bday_post(user:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
 
     let result = if birthday_id == 0 {
-        let new_bday = NewBirthday {
+        let new_bday = NewBirthdayRecord {
             title: bday.title.clone(),
             year: bday.year,
             month: bday.month,
-            day: bday.day
+            day: bday.day,
+            user_id: user.user_id
         };
 
         diesel::insert_into(birthdays)
@@ -131,14 +160,14 @@ fn bday_post(_unused:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birth
                 year.eq(&bday.year),
                 month.eq(&bday.month)
             ))
-        .get_result::<Birthday>(&connection)
+        .get_result::<BirthdayRecord>(&connection)
         .expect("expected a birthday")
     };
     
 
     
     // apparently has a 1mb limit
-    Json(result)
+    Json(result.as_birthday())
 }
 
 #[delete("/birthdays/<birthday_id>")]
@@ -166,13 +195,22 @@ struct LoginArgs {
 #[get("/login?<args>")]
 fn login(args:Option<LoginArgs>, mut cookies:Cookies) {
     let l = args.unwrap();
-    println!("Checking {}, {}", l.user_id, l.password);
-    if &l.user_id == "michaelfletcher" && l.password=="helloworld" {
-        let cookie = Cookie::build("user_id", "michaelfletcher")
+    
+    use ::schema::users::dsl::*;
+    let connection = establish_connection();
+
+    users
+        .limit(1)
+        .filter(user_name.eq(&l.user_id))
+        .first::<User>(&connection)
+        .expect("Error loading user");
+
+    if &l.password=="helloworld" {
+        let u = l.user_id.clone();
+        let cookie = Cookie::build("user_name", u)
             .permanent()
             .finish();
-        cookies.add_private(cookie);
-        println!("setting cookie");
+        cookies.add_private(cookie);        
     }
 }
 
@@ -180,7 +218,6 @@ fn login(args:Option<LoginArgs>, mut cookies:Cookies) {
 fn static_files(file: PathBuf) -> Option<NamedFile> {
     let frontend_path = env::var("FRONTEND_PATH")
         .expect("FRONTEND_PATH must be set");
-    println!("{:?}-{:?}", &frontend_path, &file);
     NamedFile::open(Path::new(&frontend_path).join(file)).ok()
 }
 
