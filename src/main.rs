@@ -40,22 +40,22 @@ use rocket::request::{self, Request, FromRequest};
 
 #[derive(Serialize)]
 #[derive(Deserialize)]
-pub struct Birthday {
+pub struct BirthdayEndpoint {
     pub id: i32,
     pub title: String,
-    pub year: Option<i32>,
-    pub month: i32,
-    pub day: i32
+    pub year: String,
+    pub month: String,
+    pub day: String
 }
 
-impl Birthday {
+impl BirthdayEndpoint {
     pub fn as_birthday_record(&self, user:&User) -> BirthdayRecord {
         BirthdayRecord {
             id: self.id,
             title: self.title.clone(),
-            year: self.year,
-            month: self.month,
-            day: self.day,
+            year: Some(self.year.parse().unwrap()),
+            month: self.month.parse().unwrap(),
+            day: self.day.parse().unwrap(),
             user_id: user.user_id
         }
     }
@@ -99,7 +99,7 @@ fn check(_unused:User) -> () {
 }
 
 #[get("/birthdays")]
-fn index(user:User) -> Json<Vec<Birthday>> {
+fn index(user:User) -> Json<Vec<BirthdayEndpoint>> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
@@ -110,7 +110,7 @@ fn index(user:User) -> Json<Vec<Birthday>> {
         .load::<BirthdayRecord>(&connection)
         .expect("Error loading birthdays");
 
-    let new_results = results.into_iter().map(|x| x.as_birthday()).collect();
+    let new_results = results.into_iter().map(|x| x.as_birthday_endpoint()).collect();
 
     // apparently has a 1mb limit
     Json(new_results)
@@ -118,7 +118,7 @@ fn index(user:User) -> Json<Vec<Birthday>> {
 
 // #[post("foo")] delete, put, 
 #[get("/birthdays/<birthday_id>")]
-fn bday_get(user:User, birthday_id:i32) -> Json<Birthday> {
+fn bday_get(user:User, birthday_id:i32) -> Json<BirthdayEndpoint> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
@@ -130,21 +130,32 @@ fn bday_get(user:User, birthday_id:i32) -> Json<Birthday> {
         .expect("Error loading birthdays");
 
     // apparently has a 1mb limit
-    Json(result.as_birthday())
+    Json(result.as_birthday_endpoint())
 }
 
 #[post("/birthdays/<birthday_id>", data = "<bday>")]
-fn bday_post(user:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday> {
+fn bday_post(user:User, birthday_id: i32, bday: Json<BirthdayEndpoint>) -> Json<BirthdayEndpoint> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
 
+    let t = bday.title.clone();
+    
+    let y = if bday.year.len() > 0 {
+        None
+    } else {
+        Some(bday.year.parse().expect("Year was not valid."))
+    };
+
+    let m = bday.month.parse().expect("Month was not valid.");
+    let d = bday.day.parse().expect("Day was not valid.");
+
     let result = if birthday_id == 0 {
         let new_bday = NewBirthdayRecord {
-            title: bday.title.clone(),
-            year: bday.year,
-            month: bday.month,
-            day: bday.day,
+            title: t,
+            year: y,
+            month: m,
+            day: d,
             user_id: user.user_id
         };
 
@@ -156,9 +167,10 @@ fn bday_post(user:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday
         diesel::update(birthdays.find(birthday_id))
         .set(
             (
-                title.eq(&bday.title),
-                year.eq(&bday.year),
-                month.eq(&bday.month)
+                title.eq(&t),
+                year.eq(&y),
+                month.eq(&m),
+                day.eq(&d)
             ))
         .get_result::<BirthdayRecord>(&connection)
         .expect("expected a birthday")
@@ -167,7 +179,7 @@ fn bday_post(user:User, birthday_id: i32, bday: Json<Birthday>) -> Json<Birthday
 
     
     // apparently has a 1mb limit
-    Json(result.as_birthday())
+    Json(result.as_birthday_endpoint())
 }
 
 #[delete("/birthdays/<birthday_id>")]

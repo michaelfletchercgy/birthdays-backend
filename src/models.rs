@@ -1,4 +1,4 @@
-use ::Birthday;
+use ::BirthdayEndpoint;
 
 #[derive(Queryable)]
 #[derive(Serialize)]
@@ -13,13 +13,16 @@ pub struct BirthdayRecord {
 }
 
 impl BirthdayRecord {
-    pub fn as_birthday(&self) -> Birthday {
-        Birthday {
+    pub fn as_birthday_endpoint(&self) -> BirthdayEndpoint {
+        BirthdayEndpoint {
             id: self.id,
             title: self.title.clone(),
-            year: self.year,
-            month: self.month,
-            day: self.day
+            year: match self.year {
+                None => "".to_string(),
+                Some(x) => x.to_string()                
+            }, 
+            month: self.month.to_string(),
+            day: self.day.to_string()
         }
     }
 }
