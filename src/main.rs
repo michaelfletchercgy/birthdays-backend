@@ -15,6 +15,8 @@ extern crate r2d2_diesel;
 extern crate r2d2;
 //extern crate r2d2_postgres;
 
+extern crate chrono;
+
 pub mod schema;
 pub mod models;
 
@@ -96,6 +98,39 @@ pub fn establish_connection() -> PgConnection {
 #[get("/check")]
 fn check(_unused:User) -> () {    
 
+}
+
+#[post("/birthdays/list/months", data = "<bday>")]
+fn bday_list_month(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>> {
+    use chrono::{NaiveDate, Datelike};
+
+    let today = chrono::Local::now().naive_local().date();
+
+    let year:i32 = match bday.year.parse() {
+        Ok(y) => y,
+        Err(_) => today.year()
+    };
+
+    let month:u32 = match bday.month.parse() {
+        Ok(m) => m,
+        Err(_) => today.month()
+    };
+
+    let mut date = NaiveDate::from_ymd(year, month, 28);
+
+    let mut result: Vec<String> = Vec::new();
+    for i in 1..28 {
+        result.push(i.to_string());
+    }
+
+    let start_month = date.month();
+    while start_month == date.month() {
+        result.push(date.day().to_string());
+        date = date.succ();
+    }
+    // increment until we find ourselves into the next month.  That would be the number of months to work with.
+
+    Json(result)
 }
 
 #[get("/birthdays")]
@@ -247,7 +282,67 @@ fn main() {
 
     rocket::ignite()
         .mount("/bday/", routes![static_files])
-        .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete])        
+        .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete, bday_list_month])        
         .launch();
 }
 
+#[cfg(test)]
+fn test_bday_list_month(year:&str, month:&str, day:&str, exp: Vec<&str>) {
+    let user = User {
+        user_id: 0,
+        user_name: "Hello World".to_string()
+    };
+
+    let bday = Json(BirthdayEndpoint {
+        id: 0,
+        title: "whatever".to_string(),
+        year: year.to_string(),
+        month: month.to_string(),
+        day: day.to_string(),
+    });
+
+    let result = bday_list_month(user, bday);
+
+    assert_eq!(result.into_inner(), exp);
+}
+
+#[cfg(test)]
+#[test]
+fn test_bday_list_month_31d() {
+    test_bday_list_month("2018", "1", "4",
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+                        "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27",
+                        "28", "29", "30", "31"]
+    );
+}
+
+
+#[cfg(test)]
+#[test]
+fn test_bday_list_month_28d() {
+    test_bday_list_month("2018", "2", "4",
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+                        "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27",
+                        "28"]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn test_bday_list_month_29d() {
+    test_bday_list_month("2016", "2", "4",
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+                        "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27",
+                        "28", "29"]
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn test_bday_list_month_bad_year() {
+    test_bday_list_month("asdf", "1", "asdf",
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14",
+                        "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27",
+                        "28", "29", "30", "31"]
+    );
+}

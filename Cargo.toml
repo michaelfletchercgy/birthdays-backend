@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Michael Fletcher <m.fletcher@theplanet.ca>"]
 
 [dependencies]
+# date math
+chrono = "0.4.0"
+
 # rocket & the web
 rocket = "0.3.4"
 rocket_codegen = "0.3.4"
