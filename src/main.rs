@@ -42,12 +42,14 @@ use rocket::request::{self, Request, FromRequest};
 
 #[derive(Serialize)]
 #[derive(Deserialize)]
+#[derive(Clone)]
 pub struct BirthdayEndpoint {
     pub id: i32,
     pub title: String,
     pub year: String,
     pub month: String,
-    pub day: String
+    pub day: String,
+    pub short_display: Option<String>
 }
 
 impl BirthdayEndpoint {
@@ -100,8 +102,28 @@ fn check(_unused:User) -> () {
 
 }
 
-#[post("/birthdays/list/months", data = "<bday>")]
-fn bday_list_month(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>> {
+#[get("/birthdays/month/list")]
+fn bday_month_list(_user:User) -> Json<Vec<String>> {
+    let mut months = Vec::new();
+    for m in 1..13 {
+        months.push(format!("{} - {}", m, models::month_name(m)));
+    }
+    
+    Json(months)
+}
+
+#[post("/birthdays/month/set", data = "<bday>")]
+fn bday_month_set(_user:User, bday: Json<BirthdayEndpoint>) -> Json<BirthdayEndpoint> {
+    
+    let mut new_bday = bday.clone();
+    new_bday.day = "".to_string();
+
+    Json(new_bday)
+}
+
+
+#[post("/birthdays/day/list", data = "<bday>")]
+fn bday_day_list(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>> {
     use chrono::{NaiveDate, Datelike};
 
     let today = chrono::Local::now().naive_local().date();
@@ -111,12 +133,12 @@ fn bday_list_month(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>
         Err(_) => today.year()
     };
 
-    let month:u32 = match bday.month.parse() {
-        Ok(m) => m,
-        Err(_) => today.month()
+    let month:i32 =  match models::parse_month(&bday.month) {
+        Some(m) => m,
+        None => 1 // assume january
     };
 
-    let mut date = NaiveDate::from_ymd(year, month, 28);
+    let mut date = NaiveDate::from_ymd(year, month as u32, 28);
 
     let mut result: Vec<String> = Vec::new();
     for i in 1..28 {
@@ -177,12 +199,14 @@ fn bday_post(user:User, birthday_id: i32, bday: Json<BirthdayEndpoint>) -> Json<
     let t = bday.title.clone();
     
     let y = if bday.year.len() > 0 {
-        None
-    } else {
         Some(bday.year.parse().expect("Year was not valid."))
+    } else {
+        None
+        
     };
 
-    let m = bday.month.parse().expect("Month was not valid.");
+    let m = models::parse_month(&bday.month).unwrap();
+    
     let d = bday.day.parse().expect("Day was not valid.");
 
     let result = if birthday_id == 0 {
@@ -211,9 +235,7 @@ fn bday_post(user:User, birthday_id: i32, bday: Json<BirthdayEndpoint>) -> Json<
         .expect("expected a birthday")
     };
     
-
-    
-    // apparently has a 1mb limit
+    // TODO apparently has a 1mb limit
     Json(result.as_birthday_endpoint())
 }
 
@@ -282,7 +304,8 @@ fn main() {
 
     rocket::ignite()
         .mount("/bday/", routes![static_files])
-        .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete, bday_list_month])        
+        .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete, bday_month_list, bday_day_list,
+            bday_month_set])        
         .launch();
 }
 
