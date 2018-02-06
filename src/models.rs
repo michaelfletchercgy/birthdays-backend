@@ -3,6 +3,7 @@ use ::BirthdayEndpoint;
 #[derive(Queryable)]
 #[derive(Serialize)]
 #[derive(Deserialize)]
+#[derive(Debug)]
 pub struct BirthdayRecord {
     pub id: i32,
     pub title: String,

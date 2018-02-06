@@ -20,9 +20,11 @@ extern crate chrono;
 pub mod schema;
 pub mod models;
 
+use chrono::{NaiveDate, Datelike};
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
+use std::cmp::Ordering;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
@@ -43,6 +45,7 @@ use rocket::request::{self, Request, FromRequest};
 #[derive(Serialize)]
 #[derive(Deserialize)]
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct BirthdayEndpoint {
     pub id: i32,
     pub title: String,
@@ -124,8 +127,6 @@ fn bday_month_set(_user:User, bday: Json<BirthdayEndpoint>) -> Json<BirthdayEndp
 
 #[post("/birthdays/day/list", data = "<bday>")]
 fn bday_day_list(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>> {
-    use chrono::{NaiveDate, Datelike};
-
     let today = chrono::Local::now().naive_local().date();
 
     let year:i32 = match bday.year.parse() {
@@ -161,14 +162,32 @@ fn index(user:User) -> Json<Vec<BirthdayEndpoint>> {
 
     let connection = establish_connection();
 
-    let results = birthdays
+    let mut results = birthdays
         .filter(user_id.eq(user.user_id))
-        .order(title.asc())
         .load::<BirthdayRecord>(&connection)
         .expect("Error loading birthdays");
 
-    let new_results = results.into_iter().map(|x| x.as_birthday_endpoint()).collect();
+    let today = chrono::Local::now().naive_local().date();
 
+    results.sort_unstable_by(|a, b| {
+        let a_date = NaiveDate::from_ymd(today.year(), a.month as u32, a.day as u32);
+        let b_date = NaiveDate::from_ymd(today.year(), b.month as u32, b.day as u32);
+
+        a_date.cmp(&b_date)
+    });
+
+    let pos = match results.iter().position(|bday| NaiveDate::from_ymd(today.year(), bday.month as u32, bday.day as u32).cmp(&today) == Ordering::Greater)
+    {
+        Some(pos) => pos,
+        None => 0
+    };
+
+    // Shuffle the results so that the next birthdays appear next.
+    let mut second_part = results.split_off(pos);
+    second_part.append(&mut results);
+
+    let new_results: Vec<BirthdayEndpoint> = second_part.into_iter().map(|x| x.as_birthday_endpoint()).collect();
+    
     // apparently has a 1mb limit
     Json(new_results)
 }
