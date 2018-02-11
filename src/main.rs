@@ -93,6 +93,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     }
 }
 
+#[derive(FromForm)]
+struct BirthdayListArgs {
+    sort: String
+}
+
 pub fn establish_connection() -> PgConnection {
     let database_url = env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
@@ -156,40 +161,48 @@ fn bday_day_list(_user:User, bday: Json<BirthdayEndpoint>) -> Json<Vec<String>> 
     Json(result)
 }
 
-#[get("/birthdays")]
-fn index(user:User) -> Json<Vec<BirthdayEndpoint>> {
+#[get("/birthdays?<args>")]
+fn index(user:User, args:BirthdayListArgs) -> Json<Vec<BirthdayEndpoint>> {
     use ::schema::birthdays::dsl::*;
 
     let connection = establish_connection();
 
+    // TODO this is a good one to think about testing, esp
+    // the database and sorting.
+    
     let mut results = birthdays
         .filter(user_id.eq(user.user_id))
+        .order(title.asc())
         .load::<BirthdayRecord>(&connection)
         .expect("Error loading birthdays");
 
     let today = chrono::Local::now().naive_local().date();
-
-    results.sort_unstable_by(|a, b| {
-        let a_date = NaiveDate::from_ymd(today.year(), a.month as u32, a.day as u32);
-        let b_date = NaiveDate::from_ymd(today.year(), b.month as u32, b.day as u32);
-
-        a_date.cmp(&b_date)
-    });
-
-    let pos = match results.iter().position(|bday| NaiveDate::from_ymd(today.year(), bday.month as u32, bday.day as u32).cmp(&today) == Ordering::Greater)
-    {
-        Some(pos) => pos,
-        None => 0
-    };
-
-    // Shuffle the results so that the next birthdays appear next.
-    let mut second_part = results.split_off(pos);
-    second_part.append(&mut results);
-
-    let new_results: Vec<BirthdayEndpoint> = second_part.into_iter().map(|x| x.as_birthday_endpoint()).collect();
     
+    let new_results: Vec<BirthdayEndpoint> = if args.sort == "next" {        
+        results.sort_unstable_by(|a, b| {
+            let a_date = NaiveDate::from_ymd(today.year(), a.month as u32, a.day as u32);
+            let b_date = NaiveDate::from_ymd(today.year(), b.month as u32, b.day as u32);
+
+            a_date.cmp(&b_date)
+        });
+
+        let pos = match results.iter().position(|bday| NaiveDate::from_ymd(today.year(), bday.month as u32, bday.day as u32).cmp(&today) == Ordering::Greater)
+        {
+            Some(pos) => pos,
+            None => 0
+        };
+
+        // Shuffle the results so that the next birthdays appear next.
+        let mut second_part = results.split_off(pos);
+        second_part.append(&mut results);
+    
+        second_part.into_iter().map(|x| x.as_birthday_endpoint()).collect()
+    } else {
+        results.into_iter().map(|x| x.as_birthday_endpoint()).collect()
+    };
+    //}
     // apparently has a 1mb limit
-    Json(new_results)
+    Json(new_results)    
 }
 
 // #[post("foo")] delete, put, 
