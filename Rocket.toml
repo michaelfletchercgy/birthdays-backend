@@ -1,4 +1,5 @@
 [development]
 address = "127.0.0.1"
 port = 8000
+secret_key = "BrtQ5LHkmXxN/+8S8nF8ufv5NuXgXHiXSdYgOz3LJd0="
 
