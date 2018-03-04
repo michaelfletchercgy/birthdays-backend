@@ -26,8 +26,6 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::cmp::Ordering;
 use std::env;
-use std::path::Path;
-use std::path::PathBuf;
 
 use self::models::*;
 //use self::diesel::prelude::*;
@@ -36,7 +34,6 @@ use diesel::Connection;
 use rocket_contrib::Json;
 
 use rocket::Outcome;
-use rocket::response::NamedFile;
 use rocket::http::Status;
 use rocket::http::Cookies;
 use rocket::http::Cookie;
@@ -315,13 +312,6 @@ fn login(args:Option<LoginArgs>, mut cookies:Cookies) {
     }
 }
 
-#[get("/<file..>")]
-fn static_files(file: PathBuf) -> Option<NamedFile> {
-    let frontend_path = env::var("FRONTEND_PATH")
-        .expect("FRONTEND_PATH must be set");
-    NamedFile::open(Path::new(&frontend_path).join(file)).ok()
-}
-
 embed_migrations!("migrations");
 
 fn main() {
@@ -335,7 +325,6 @@ fn main() {
     embedded_migrations::run_with_output(&connection, &mut std::io::stdout()).unwrap();
 
     rocket::ignite()
-        .mount("/bday/", routes![static_files])
         .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete, bday_month_list, bday_day_list,
             bday_month_set])        
         .launch();
