@@ -4,11 +4,11 @@
 
 * You can add/update/remove birthdays.
 * Birthdays display in upcoming order or alphabetical order..
+* Is production and uat versions deployed over HTTPS.
 
 
 ## (MVP)
 
-* Need a uat/production versions (helpful for serviceworker I think as it would be with https).
 * Simple notifications.
 * Seems to require two builds to update the client (think it is the serviceworker?)
 * Error tracking / monitoring.
