@@ -17,6 +17,8 @@ extern crate r2d2;
 
 extern crate chrono;
 
+extern crate reqwest;
+
 pub mod schema;
 pub mod models;
 
@@ -26,6 +28,7 @@ use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::cmp::Ordering;
 use std::env;
+use std::time::Duration;
 
 use self::models::*;
 //use self::diesel::prelude::*;
@@ -39,6 +42,10 @@ use rocket::http::Cookies;
 use rocket::http::Cookie;
 use rocket::request::{self, Request, FromRequest};
 
+extern crate scheduled_thread_pool;
+
+mod notifications;
+
 #[derive(Serialize)]
 #[derive(Deserialize)]
 #[derive(Clone)]
@@ -50,6 +57,15 @@ pub struct BirthdayEndpoint {
     pub month: String,
     pub day: String,
     pub short_display: Option<String>
+}
+
+#[derive(Serialize)]
+#[derive(Deserialize)]
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct SubscriptionEndpoint {
+    pub id: i32,
+    pub url: String
 }
 
 impl BirthdayEndpoint {
@@ -274,6 +290,7 @@ fn bday_delete(_unused:User, birthday_id: i32) -> String {
 
     let connection = establish_connection();
 
+    // TODO needs to consider user_id.
     diesel::delete(
         birthdays.filter(id.eq(birthday_id))
     )
@@ -282,6 +299,40 @@ fn bday_delete(_unused:User, birthday_id: i32) -> String {
     // should have done something here.
     
     String::from("ok")
+}
+
+#[post("/subscriptions", data = "<subs>")]
+fn subscription_post(user:User, subs: Json<SubscriptionEndpoint>) -> Json<SubscriptionEndpoint> {
+    let con = establish_connection();
+
+    use ::schema::subscriptions::dsl::*;
+
+    let result = diesel::insert_into(subscriptions)
+        .values(
+            (
+                user_id.eq(&user.user_id),
+                url.eq(&subs.url),
+            )
+        )
+        .get_result::<SubscriptionRecord>(&con)
+        .expect("error inserting stuff");
+
+    Json(result.as_endpoint())
+}
+
+#[delete("/subscriptions/<p_subscription_id>")]
+fn subscription_delete(user:User, p_subscription_id: i32) {
+    let con = establish_connection();
+
+    use ::schema::subscriptions::dsl::*;
+    
+    diesel::delete(
+        subscriptions
+            .filter(user_id.eq(&user.user_id))
+            .filter(subscription_id.eq(p_subscription_id))
+    )
+    .execute(&con)
+    .expect("delete ok");
 }
 
 #[derive(FromForm)]
@@ -317,6 +368,11 @@ embed_migrations!("migrations");
 fn main() {
     dotenv().ok();
 
+    let scheduled_pool = scheduled_thread_pool::ScheduledThreadPool::with_name("schedule", 1);
+    
+    scheduled_pool.execute_at_fixed_rate(Duration::from_secs(5), Duration::from_secs(60), || { 
+        notifications::push_to_subscriptions(&establish_connection());
+    });
 
     let connection = establish_connection();
 
@@ -326,7 +382,7 @@ fn main() {
 
     rocket::ignite()
         .mount("/api/", routes![index, bday_get, bday_post, login, bday_delete, bday_month_list, bday_day_list,
-            bday_month_set])        
+            bday_month_set, subscription_post, subscription_delete])        
         .launch();
 }
 

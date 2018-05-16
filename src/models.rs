@@ -1,4 +1,5 @@
 use ::BirthdayEndpoint;
+use ::SubscriptionEndpoint;
 
 #[derive(Queryable)]
 #[derive(Serialize)]
@@ -41,6 +42,26 @@ impl BirthdayRecord {
         }
     }
 }
+
+#[derive(Queryable)]
+#[derive(Serialize)]
+#[derive(Deserialize)]
+#[derive(Debug)]
+pub struct SubscriptionRecord {
+    pub notification_subscription_id: i32,
+    pub user_id: i32,
+    pub url:String
+}
+
+impl SubscriptionRecord {
+    pub fn as_endpoint(&self) -> SubscriptionEndpoint {
+        SubscriptionEndpoint {
+            id: self.notification_subscription_id,
+            url: self.url.clone()
+        }
+    }
+}
+
 
 pub fn month_name(m:i32) -> String {
     match m {

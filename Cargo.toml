@@ -4,8 +4,11 @@ version = "0.1.0"
 authors = ["Michael Fletcher <m.fletcher@theplanet.ca>"]
 
 [dependencies]
-# date math
-chrono = "0.4.0"
+# date math and mapping postgres date types
+chrono = { version = "0.4", features = ["serde"] }
+
+# periodic execution
+scheduled-thread-pool = "0.2.0"
 
 # rocket & the web
 rocket = "0.3.4"
@@ -17,7 +20,7 @@ serde = "1.0"
 serde_derive = "1.0"
 
 # diesel 
-diesel = { version = "1.0.0-beta1", features = ["postgres"] }
+diesel = { version = "1.0.0-beta1", features = ["postgres", "chrono"] }
 diesel_migrations = "1.0.0-beta1"
 diesel_infer_schema = { version = "1.0.0-beta1", features = ["postgres"] }
 dotenv = "0.9.0"
@@ -26,3 +29,6 @@ r2d2-diesel = "1.0.0-beta1"
 r2d2 = "0.8.1"
 #r2d2_postgres = "0.14.0"
 
+# making https requests
+
+reqwest = "0.8.5"
