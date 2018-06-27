@@ -371,7 +371,7 @@ fn main() {
     let scheduled_pool = scheduled_thread_pool::ScheduledThreadPool::with_name("schedule", 1);
     
     scheduled_pool.execute_at_fixed_rate(Duration::from_secs(5), Duration::from_secs(60), || { 
-        notifications::push_to_subscriptions(&establish_connection());
+    //    notifications::push_to_subscriptions(&establish_connection());
     });
 
     let connection = establish_connection();
