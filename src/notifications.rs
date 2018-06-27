@@ -13,6 +13,9 @@ pub fn push_to_subscriptions(con:&PgConnection) {
     let today = chrono::Local::now().naive_local().date();
     let seven_days = today + Duration::days(7);
     // filter for unique user ids with birthdays in the next seven days.  Gotta figure out a weird OR clause to do that.
+
+    println!("Sending notifications.");
+    
     let users_with_nots = birthdays
         .select(schema::birthdays::dsl::user_id)
         .filter(
