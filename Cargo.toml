@@ -32,6 +32,9 @@ r2d2 = "0.8.2"
 #r2d2_postgres = "0.14.0"
 
 # making https requests
-
 reqwest = "0.9.4"
+
+
+# Sentry for error reporting.
+sentry = "0.12.0"
 

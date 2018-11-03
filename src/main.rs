@@ -44,6 +44,8 @@ use rocket::request::{self, Request, FromRequest};
 
 extern crate scheduled_thread_pool;
 
+extern crate sentry;
+use sentry::integrations::panic::register_panic_handler;
 mod notifications;
 
 #[derive(Serialize)]
@@ -367,6 +369,11 @@ embed_migrations!("migrations");
 
 fn main() {
     dotenv().ok();
+    let sentry_dsn = env::var("SENTRY_DSN")
+        .expect("SENTRY_DSN must be set");
+    let guard = sentry::init(sentry_dsn);
+    std::mem::forget(guard); // purposefully leak this guard so that sentry remainins running for life of program.
+    register_panic_handler();
 
     let scheduled_pool = scheduled_thread_pool::ScheduledThreadPool::with_name("schedule", 1);
     
