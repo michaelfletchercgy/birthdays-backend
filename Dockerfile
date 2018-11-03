@@ -21,7 +21,7 @@ RUN apt-get update
 RUN apt-get install -y nodejs git build-essential pkg-config libpq-dev libssl-dev unzip
 
 # RUST COMPILER
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2018-06-05
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2018-11-02
 ENV PATH=/root/.cargo/bin:$PATH
 
 # Copy the minimal amount in to cache the build resources.
@@ -30,11 +30,11 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 RUN mkdir src
 RUN touch src/lib.rs
-RUN cargo +nightly-2018-06-05 build --release
+RUN cargo +nightly-2018-11-02 build --release
 
 # Now Compile
 COPY . .
-RUN cargo +nightly-2018-06-05 build --release
+RUN cargo +nightly-2018-11-02 build --release
 
 
 # Runtime
